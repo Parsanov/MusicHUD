@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+
+    <!-- .NET 10 (LTS). Версія Windows у TFM вмикає WinRT-проєкції: Windows.Media.Control
+         стає доступним без жодного додаткового NuGet-пакета. -->
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+
+    <!-- Мінімальна ОС, на якій застосунок запуститься (Win10 1809). -->
+    <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
+
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+
+    <AssemblyName>NowPlayingHud</AssemblyName>
+    <RootNamespace>NowPlayingHud</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\app.ico</ApplicationIcon>
+
+    <!-- Швидший холодний старт. Trimming і NativeAOT з WPF не працюють. -->
+    <PublishReadyToRun>true</PublishReadyToRun>
+
+    <!-- Не тягнути десятки локалізаційних сателітів у вихідну теку. -->
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="H.NotifyIcon.Wpf" Version="2.4.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\app.ico" />
+  </ItemGroup>
+
+</Project>

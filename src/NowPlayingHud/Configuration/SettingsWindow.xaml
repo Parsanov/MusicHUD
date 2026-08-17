@@ -1,0 +1,207 @@
+<Window x:Class="NowPlayingHud.Configuration.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="NowPlaying HUD — налаштування"
+        Width="480"
+        SizeToContent="Height"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterScreen"
+        ShowInTaskbar="True"
+        Background="#FF1B1B1F"
+        Foreground="#FFEDEDED"
+        FontSize="12">
+
+    <Window.Resources>
+        <Style TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#FFEDEDED" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style TargetType="CheckBox">
+            <Setter Property="Foreground" Value="#FFEDEDED" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style x:Key="SectionHeader" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#FF8E8E96" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Margin" Value="0,16,0,6" />
+        </Style>
+        <Style x:Key="HotkeyBox" TargetType="TextBox">
+            <Setter Property="IsReadOnly" Value="True" />
+            <Setter Property="IsReadOnlyCaretVisible" Value="False" />
+            <Setter Property="Background" Value="#FF26262B" />
+            <Setter Property="Foreground" Value="#FFEDEDED" />
+            <Setter Property="BorderBrush" Value="#FF3A3A42" />
+            <Setter Property="Padding" Value="6,4" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+        <Style x:Key="ModeRadio" TargetType="RadioButton">
+            <Setter Property="Foreground" Value="#FFEDEDED" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Margin" Value="0,0,16,0" />
+        </Style>
+
+        <!-- Кут вибирається сіткою 2x2, а не списком: розташування просторове,
+             і кнопка в потрібному куті зрозуміліша за рядок «Нижній правий». -->
+        <Style x:Key="CornerButton" TargetType="RadioButton">
+            <Setter Property="Margin" Value="2" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="Root"
+                                Background="#FF26262B"
+                                BorderBrush="#FF3A3A42"
+                                BorderThickness="1"
+                                CornerRadius="4">
+                            <!-- Мініатюра картки в тому куті, який обирається -->
+                            <Border x:Name="Dot"
+                                    Width="18" Height="7"
+                                    Margin="5"
+                                    CornerRadius="2"
+                                    Background="#FF8E8E96"
+                                    HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                    VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Root" Property="Background" Value="#FF33456B" />
+                                <Setter TargetName="Root" Property="BorderBrush" Value="#FF5C7FBF" />
+                                <Setter TargetName="Dot" Property="Background" Value="#FFEDEDED" />
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Root" Property="BorderBrush" Value="#FF6A6A75" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <StackPanel Margin="18,14,18,18">
+
+        <!-- 1. Хоткеї -->
+        <TextBlock Text="1. Хоткеї" Style="{StaticResource SectionHeader}" />
+        <TextBlock Text="Клікни в поле і натисни комбінацію. Esc — очистити."
+                   Foreground="#FF8E8E96" Margin="0,0,0,8" TextWrapping="Wrap" />
+
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="150" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <TextBlock Grid.Row="0" Grid.Column="0" Text="Показати HUD" />
+            <TextBox Grid.Row="0" Grid.Column="1" x:Name="ToggleHotkeyBox"
+                     Style="{StaticResource HotkeyBox}" Margin="0,0,0,6"
+                     PreviewKeyDown="OnHotkeyBoxKeyDown" />
+
+            <TextBlock Grid.Row="1" Grid.Column="0" Text="Пауза / відтворення" />
+            <TextBox Grid.Row="1" Grid.Column="1" x:Name="PlayPauseHotkeyBox"
+                     Style="{StaticResource HotkeyBox}" Margin="0,0,0,6"
+                     PreviewKeyDown="OnHotkeyBoxKeyDown" />
+
+            <TextBlock Grid.Row="2" Grid.Column="0" Text="Наступний трек" />
+            <TextBox Grid.Row="2" Grid.Column="1" x:Name="NextHotkeyBox"
+                     Style="{StaticResource HotkeyBox}" Margin="0,0,0,6"
+                     PreviewKeyDown="OnHotkeyBoxKeyDown" />
+
+            <TextBlock Grid.Row="3" Grid.Column="0" Text="Попередній трек" />
+            <TextBox Grid.Row="3" Grid.Column="1" x:Name="PreviousHotkeyBox"
+                     Style="{StaticResource HotkeyBox}"
+                     PreviewKeyDown="OnHotkeyBoxKeyDown" />
+        </Grid>
+
+        <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+            <TextBlock Text="Режим показу:" Margin="0,0,12,0" />
+            <RadioButton x:Name="ToggleModeRadio" Content="По натисканню" GroupName="Mode"
+                         Style="{StaticResource ModeRadio}" Checked="OnModeChanged" />
+            <RadioButton x:Name="HoldModeRadio" Content="Утримувати" GroupName="Mode"
+                         Style="{StaticResource ModeRadio}" Checked="OnModeChanged" />
+        </StackPanel>
+
+        <TextBlock x:Name="ConflictText" Foreground="#FFE0A030" TextWrapping="Wrap"
+                   Margin="0,8,0,0" Visibility="Collapsed" />
+
+        <!-- 2. Розташування -->
+        <TextBlock Text="2. Розташування" Style="{StaticResource SectionHeader}" />
+        <StackPanel Orientation="Horizontal">
+            <TextBlock Text="Кут" Width="150" VerticalAlignment="Top" Margin="0,4,0,0" />
+            <UniformGrid Rows="2" Columns="2" Width="124" Height="84" HorizontalAlignment="Left">
+                <RadioButton x:Name="CornerTopLeft" GroupName="Corner" Tag="TopLeft"
+                             Style="{StaticResource CornerButton}"
+                             HorizontalContentAlignment="Left" VerticalContentAlignment="Top"
+                             Checked="OnCornerChecked" />
+                <RadioButton x:Name="CornerTopRight" GroupName="Corner" Tag="TopRight"
+                             Style="{StaticResource CornerButton}"
+                             HorizontalContentAlignment="Right" VerticalContentAlignment="Top"
+                             Checked="OnCornerChecked" />
+                <RadioButton x:Name="CornerBottomLeft" GroupName="Corner" Tag="BottomLeft"
+                             Style="{StaticResource CornerButton}"
+                             HorizontalContentAlignment="Left" VerticalContentAlignment="Bottom"
+                             Checked="OnCornerChecked" />
+                <RadioButton x:Name="CornerBottomRight" GroupName="Corner" Tag="BottomRight"
+                             Style="{StaticResource CornerButton}"
+                             HorizontalContentAlignment="Right" VerticalContentAlignment="Bottom"
+                             Checked="OnCornerChecked" />
+            </UniformGrid>
+        </StackPanel>
+        <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+            <TextBlock Text="Відступ від краю" Width="150" />
+            <Slider x:Name="MarginSlider" Width="160" Minimum="0" Maximum="120"
+                    TickFrequency="4" IsSnapToTickEnabled="True"
+                    ValueChanged="OnMarginChanged" VerticalAlignment="Center" />
+            <TextBlock x:Name="MarginValueText" Margin="10,0,0,0" Width="50" />
+        </StackPanel>
+
+        <!-- 3. Пасивний показ -->
+        <TextBlock Text="3. Пасивний показ" Style="{StaticResource SectionHeader}" />
+        <CheckBox x:Name="PassiveCheck" Content="Показувати HUD при зміні треку"
+                  Checked="OnPassiveChanged" Unchecked="OnPassiveChanged" />
+        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+            <TextBlock Text="Тривалість" Width="150" />
+            <Slider x:Name="PassiveSecondsSlider" Width="160" Minimum="1" Maximum="15"
+                    TickFrequency="0.5" IsSnapToTickEnabled="True"
+                    ValueChanged="OnPassiveSecondsChanged" VerticalAlignment="Center" />
+            <TextBlock x:Name="PassiveSecondsText" Margin="10,0,0,0" Width="50" />
+        </StackPanel>
+
+        <!-- 4. Масштаб -->
+        <TextBlock Text="4. Масштаб" Style="{StaticResource SectionHeader}" />
+        <StackPanel Orientation="Horizontal">
+            <TextBlock Text="Розмір HUD" Width="150" />
+            <Slider x:Name="ScaleSlider" Width="160" Minimum="0.8" Maximum="1.6"
+                    TickFrequency="0.05" IsSnapToTickEnabled="True"
+                    ValueChanged="OnScaleChanged" VerticalAlignment="Center" />
+            <TextBlock x:Name="ScaleValueText" Margin="10,0,0,0" Width="50" />
+        </StackPanel>
+
+        <!-- 5. Автозапуск -->
+        <TextBlock Text="5. Автозапуск" Style="{StaticResource SectionHeader}" />
+        <CheckBox x:Name="StartupCheck" Content="Запускати разом з Windows"
+                  Checked="OnStartupChanged" Unchecked="OnStartupChanged" />
+
+        <!-- 6. Джерело -->
+        <TextBlock Text="6. Джерело" Style="{StaticResource SectionHeader}" />
+        <StackPanel Orientation="Horizontal">
+            <TextBlock Text="Застосунок" Width="150" />
+            <ComboBox x:Name="SourceCombo" Width="180" SelectionChanged="OnSourceChanged" />
+        </StackPanel>
+        <TextBlock Text="«Автоматично» бере активну системну сесію. Якщо паралельно грає Spotify і висить вкладка на паузі, краще закріпити конкретний застосунок. Список оновлюється сам."
+                   Foreground="#FF8E8E96" TextWrapping="Wrap" Margin="0,6,0,0" />
+
+        <!-- Низ -->
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
+            <TextBlock x:Name="SettingsPathText" Foreground="#FF6A6A72" FontSize="10"
+                       VerticalAlignment="Center" Margin="0,0,12,0" />
+            <Button Content="Закрити" Padding="16,5" Click="OnCloseClick" />
+        </StackPanel>
+    </StackPanel>
+</Window>
