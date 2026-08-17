@@ -23,6 +23,12 @@ public partial class OverlayWindow : Window
     private IntPtr _hwnd;
     private bool _hiding;
 
+    /// <summary>Кліки зараз ловить HUD, а не гра під ним.</summary>
+    private bool _interactive;
+
+    /// <summary>Показаний без автоприховування — до явного закриття.</summary>
+    private bool _pinnedOpen;
+
     public OverlayWindow(OverlayViewModel viewModel, AppSettings settings)
     {
         _viewModel = viewModel;
@@ -129,24 +135,41 @@ public partial class OverlayWindow : Window
     /// <param name="autoHideAfter">Скільки тримати на екрані; null — до повторного натискання.</param>
     public void ToggleHud(TimeSpan? autoHideAfter = null)
     {
-        if (IsHudVisible)
+        // HUD, який виїхав сам (пасивний показ), хоткеєм не ховається, а стає
+        // клікабельним: якщо він уже на екрані і не реагує на мишу, користувач
+        // тисне хоткей, щоб ним керувати, а не щоб його прибрати.
+        if (IsHudVisible && _interactive)
         {
             HideHud();
+            return;
         }
-        else
-        {
-            ShowHud(interactive: true, autoHideAfter: autoHideAfter);
-        }
+
+        ShowHud(interactive: true, autoHideAfter: autoHideAfter);
     }
 
     /// <param name="interactive">true — кнопки клікабельні; false — кліки проходять у гру.</param>
     /// <param name="autoHideAfter">Скільки тримати на екрані; null — до явного приховування.</param>
     public void ShowHud(bool interactive, TimeSpan? autoHideAfter)
     {
+        var wasVisible = IsHudVisible;
+
+        // Пасивний показ не має відбирати клікабельність у HUD, який уже висить
+        // після ручного виклику. Інакше виходить так: клікаєш "next" мишею,
+        // трек змінюється, звідти прилітає пасивний показ з interactive: false,
+        // вмикає WS_EX_TRANSPARENT — і наступний клік провалюється крізь оверлей
+        // у гру, хоча HUD видно і він виглядає робочим.
+        var effectiveInteractive = interactive || (wasVisible && _interactive);
+
+        // Так само пасивний показ не має ставити таймер на HUD, відкритий
+        // "до повторного натискання" (hold-to-peek).
+        var stayOpen = (wasVisible && _pinnedOpen) || autoHideAfter is null;
+
         _autoHideTimer.Stop();
         _hiding = false;
+        _interactive = effectiveInteractive;
+        _pinnedOpen = stayOpen;
 
-        NativeMethods.SetClickThrough(_hwnd, clickThrough: !interactive);
+        NativeMethods.SetClickThrough(_hwnd, clickThrough: !effectiveInteractive);
 
         if (!IsVisible)
         {
@@ -162,9 +185,14 @@ public partial class OverlayWindow : Window
         IsHudVisible = true;
         _viewModel.StartProgressUpdates();
 
-        RunShowAnimation();
+        // Якщо HUD уже на екрані, повторна анімація виїзду читається як смикання
+        // картки на кожній зміні треку.
+        if (!wasVisible)
+        {
+            RunShowAnimation();
+        }
 
-        if (autoHideAfter is { } delay)
+        if (!stayOpen && autoHideAfter is { } delay)
         {
             _autoHideTimer.Interval = delay;
             _autoHideTimer.Start();
@@ -182,6 +210,8 @@ public partial class OverlayWindow : Window
 
         _hiding = true;
         IsHudVisible = false;
+        _interactive = false;
+        _pinnedOpen = false;
 
         RunHideAnimation();
     }
