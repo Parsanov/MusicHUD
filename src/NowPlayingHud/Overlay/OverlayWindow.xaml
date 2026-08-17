@@ -1,0 +1,243 @@
+<Window x:Class="NowPlayingHud.Overlay.OverlayWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:overlay="clr-namespace:NowPlayingHud.Overlay"
+        Title="NowPlaying HUD"
+        SizeToContent="WidthAndHeight"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        ShowInTaskbar="False"
+        Topmost="True"
+        ResizeMode="NoResize"
+        Focusable="False"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True"
+        RenderOptions.BitmapScalingMode="HighQuality">
+
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+        <overlay:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisibility" />
+
+        <SolidColorBrush x:Key="HudBackground" Color="#F0141416" />
+        <!-- 8% від 255 = 0x14: обрис має відділяти картку від фону гри, не малювати рамку -->
+        <SolidColorBrush x:Key="HudBorder" Color="#14FFFFFF" />
+        <SolidColorBrush x:Key="HudPrimaryText" Color="#FFF2F2F2" />
+        <SolidColorBrush x:Key="HudSecondaryText" Color="#FF9A9AA0" />
+        <SolidColorBrush x:Key="HudTrack" Color="#26FFFFFF" />
+        <SolidColorBrush x:Key="HudFill" Color="#FFE8E8EA" />
+
+        <!-- Кнопки керування. Іконки — Path, а не шрифт:
+             Segoe Fluent Icons є не на кожній збірці Windows 10. -->
+        <Style x:Key="TransportButton" TargetType="Button">
+            <Setter Property="Width" Value="28" />
+            <Setter Property="Height" Value="28" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Root"
+                                Background="Transparent"
+                                CornerRadius="14">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Root" Property="Background" Value="#1FFFFFFF" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Root" Property="Background" Value="#3AFFFFFF" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <!-- IsEnabled приходить від CanExecute команди — біндити нічого не треба -->
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Opacity" Value="0.35" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="TransportGlyph" TargetType="Path">
+            <Setter Property="Fill" Value="{StaticResource HudPrimaryText}" />
+            <Setter Property="Stretch" Value="Uniform" />
+            <Setter Property="Width" Value="12" />
+            <Setter Property="Height" Value="12" />
+        </Style>
+
+        <Style x:Key="HudProgressBar" TargetType="ProgressBar">
+            <Setter Property="Height" Value="3" />
+            <Setter Property="Minimum" Value="0" />
+            <Setter Property="Maximum" Value="1" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ProgressBar">
+                        <Border Background="{StaticResource HudTrack}" CornerRadius="2">
+                            <Grid>
+                                <Rectangle x:Name="PART_Track" Fill="Transparent" />
+                                <Border x:Name="PART_Indicator"
+                                        HorizontalAlignment="Left"
+                                        Background="{StaticResource HudFill}"
+                                        CornerRadius="2" />
+                            </Grid>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <!-- LayoutTransform, а не RenderTransform: масштаб має міняти реальний
+         розмір вікна, бо позиція рахується від ActualWidth/ActualHeight. -->
+    <Grid x:Name="ScaleRoot">
+        <Grid.LayoutTransform>
+            <ScaleTransform x:Name="HudScale" ScaleX="1" ScaleY="1" />
+        </Grid.LayoutTransform>
+
+        <!-- Поле навколо HUD: у ньому живе анімація виїзду, інакше її обріже
+             межа вікна. Через AllowsTransparency воно повністю невидиме. -->
+        <Grid Margin="20">
+            <Border x:Name="Hud"
+                    Width="360"
+                    Height="88"
+                    CornerRadius="10"
+                    Background="{StaticResource HudBackground}"
+                    BorderBrush="{StaticResource HudBorder}"
+                    BorderThickness="1"
+                    Opacity="0">
+                <!-- Тінь коштує піксельного шейдера на кожен кадр разом з анімацією
+                     прогресу. Якщо в грі просяде fps — прибрати Effect і покласти
+                     під картку статичний RadialGradientBrush. -->
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="18" ShadowDepth="0" Direction="0"
+                                      Color="#FF000000" Opacity="0.55" />
+                </Border.Effect>
+                <Border.RenderTransform>
+                    <TranslateTransform x:Name="HudSlide" X="0" Y="0" />
+                </Border.RenderTransform>
+
+                <Grid Margin="12,10,12,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Обкладинка -->
+                    <Border Grid.Column="0"
+                            Width="64" Height="64"
+                            CornerRadius="6"
+                            Background="#1FFFFFFF"
+                            ClipToBounds="True">
+                        <Grid>
+                            <!-- Заглушка, коли джерело обкладинки не дало -->
+                            <Path Data="M9,17 L9,5 L19,3 L19,15 M9,17 A2,2 0 1 1 5,17 A2,2 0 1 1 9,17 M19,15 A2,2 0 1 1 15,15 A2,2 0 1 1 19,15"
+                                  Stroke="{StaticResource HudSecondaryText}"
+                                  StrokeThickness="1.5"
+                                  Fill="Transparent"
+                                  Stretch="Uniform"
+                                  Width="24" Height="24"
+                                  Visibility="{Binding HasCover, Converter={StaticResource InverseBoolToVisibility}}" />
+                            <Image Source="{Binding Cover}"
+                                   Stretch="UniformToFill"
+                                   Visibility="{Binding HasCover, Converter={StaticResource BoolToVisibility}}" />
+
+                            <!-- Бейдж джерела. Підкладка обов'язкова: іконки Spotify
+                                 і браузерів темні, а обкладинки бувають будь-якого
+                                 кольору — без неї бейдж зникає на половині треків. -->
+                            <Border Width="18" Height="18"
+                                    HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                                    Margin="0,0,2,2"
+                                    CornerRadius="4"
+                                    Background="#CC000000"
+                                    Visibility="{Binding HasSourceIcon, Converter={StaticResource BoolToVisibility}}">
+                                <Image Source="{Binding SourceIcon}" Width="14" Height="14" />
+                            </Border>
+                        </Grid>
+                    </Border>
+
+                    <!-- Текст і прогрес -->
+                    <StackPanel Grid.Column="1" Margin="10,2,8,2" VerticalAlignment="Center">
+                        <TextBlock x:Name="TitleText"
+                                   Text="{Binding Title}"
+                                   Foreground="{StaticResource HudPrimaryText}"
+                                   FontSize="13"
+                                   FontWeight="SemiBold"
+                                   TextTrimming="CharacterEllipsis"
+                                   TextWrapping="NoWrap" />
+
+                        <TextBlock Text="{Binding Subtitle}"
+                                   Foreground="{StaticResource HudSecondaryText}"
+                                   FontSize="11"
+                                   Margin="0,1,0,0"
+                                   TextTrimming="CharacterEllipsis"
+                                   TextWrapping="NoWrap" />
+
+                        <Grid Margin="0,8,0,0"
+                              Visibility="{Binding HasTimeline, Converter={StaticResource BoolToVisibility}}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <ProgressBar Grid.Column="0"
+                                         Style="{StaticResource HudProgressBar}"
+                                         Value="{Binding Progress, Mode=OneWay}"
+                                         VerticalAlignment="Center" />
+
+                            <TextBlock Grid.Column="1"
+                                       Margin="8,0,0,0"
+                                       Foreground="{StaticResource HudSecondaryText}"
+                                       FontSize="10"
+                                       VerticalAlignment="Center">
+                                <Run Text="{Binding PositionText, Mode=OneWay}" />
+                                <Run Text="/" />
+                                <Run Text="{Binding DurationText, Mode=OneWay}" />
+                            </TextBlock>
+                        </Grid>
+                    </StackPanel>
+
+                    <!-- Керування -->
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center"
+                                Margin="0,0,2,0">
+                        <Button Style="{StaticResource TransportButton}"
+                                Command="{Binding PreviousCommand}"
+                                ToolTip="Попередній трек">
+                            <Path Style="{StaticResource TransportGlyph}"
+                                  Data="M6,4 L6,20 L8,20 L8,4 Z M20,4 L9,12 L20,20 Z" />
+                        </Button>
+
+                        <Button Style="{StaticResource TransportButton}"
+                                Command="{Binding PlayPauseCommand}"
+                                ToolTip="Пауза / відтворення">
+                            <Grid>
+                                <!-- Пауза, коли грає -->
+                                <Path x:Name="PauseGlyph"
+                                      Style="{StaticResource TransportGlyph}"
+                                      Data="M6,4 L10,4 L10,20 L6,20 Z M14,4 L18,4 L18,20 L14,20 Z"
+                                      Visibility="{Binding IsPlaying, Converter={StaticResource BoolToVisibility}}" />
+                                <!-- Play, коли не грає -->
+                                <Path x:Name="PlayGlyph"
+                                      Style="{StaticResource TransportGlyph}"
+                                      Data="M6,4 L20,12 L6,20 Z"
+                                      Visibility="{Binding IsPlaying, Converter={StaticResource InverseBoolToVisibility}}" />
+                            </Grid>
+                        </Button>
+
+                        <Button Style="{StaticResource TransportButton}"
+                                Command="{Binding NextCommand}"
+                                ToolTip="Наступний трек">
+                            <Path Style="{StaticResource TransportGlyph}"
+                                  Data="M18,4 L18,20 L16,20 L16,4 Z M4,4 L15,12 L4,20 Z" />
+                        </Button>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</Window>
