@@ -18,6 +18,7 @@ public partial class OverlayWindow : Window
 
     private readonly OverlayViewModel _viewModel;
     private readonly DispatcherTimer _autoHideTimer;
+    private readonly DispatcherTimer _hoverTimer;
 
     private AppSettings _settings;
     private IntPtr _hwnd;
@@ -29,6 +30,12 @@ public partial class OverlayWindow : Window
     /// <summary>Показаний без автоприховування — до явного закриття.</summary>
     private bool _pinnedOpen;
 
+    /// <summary>Курсор зараз над карткою. Тимчасово знімає click-through.</summary>
+    private bool _hoverActive;
+
+    /// <summary>Тривалість, з якою треба перезапустити автоприховування після відведення курсора.</summary>
+    private TimeSpan? _autoHideDuration;
+
     public OverlayWindow(OverlayViewModel viewModel, AppSettings settings)
     {
         _viewModel = viewModel;
@@ -39,6 +46,15 @@ public partial class OverlayWindow : Window
 
         _autoHideTimer = new DispatcherTimer(DispatcherPriority.Normal);
         _autoHideTimer.Tick += (_, _) => HideHud();
+
+        // З увімкненим WS_EX_TRANSPARENT вікно не отримує жодного повідомлення
+        // миші — навіть WM_MOUSEMOVE. Тому наведення доводиться саме опитувати.
+        // 100 мс достатньо: людина не встигає клікнути швидше, ніж донесе курсор.
+        _hoverTimer = new DispatcherTimer(DispatcherPriority.Input)
+        {
+            Interval = TimeSpan.FromMilliseconds(100)
+        };
+        _hoverTimer.Tick += OnHoverTick;
 
         ApplySettings(settings);
     }
@@ -168,8 +184,9 @@ public partial class OverlayWindow : Window
         _hiding = false;
         _interactive = effectiveInteractive;
         _pinnedOpen = stayOpen;
+        _autoHideDuration = autoHideAfter;
 
-        NativeMethods.SetClickThrough(_hwnd, clickThrough: !effectiveInteractive);
+        ApplyClickThrough();
 
         if (!IsVisible)
         {
@@ -185,6 +202,18 @@ public partial class OverlayWindow : Window
         IsHudVisible = true;
         _viewModel.StartProgressUpdates();
 
+        // Пасивний показ лишається наскрізним, але має оживати під курсором:
+        // інакше картка з кнопками просто не реагує на клік, і це не відрізнити
+        // від зламаного застосунку.
+        if (effectiveInteractive)
+        {
+            _hoverTimer.Stop();
+        }
+        else
+        {
+            _hoverTimer.Start();
+        }
+
         // Якщо HUD уже на екрані, повторна анімація виїзду читається як смикання
         // картки на кожній зміні треку.
         if (!wasVisible)
@@ -192,10 +221,70 @@ public partial class OverlayWindow : Window
             RunShowAnimation();
         }
 
-        if (!stayOpen && autoHideAfter is { } delay)
+        if (!stayOpen && !_hoverActive && autoHideAfter is { } delay)
         {
             _autoHideTimer.Interval = delay;
             _autoHideTimer.Start();
+        }
+    }
+
+    /// <summary>Кліки ловить HUD, якщо він викликаний вручну або під ним курсор.</summary>
+    private void ApplyClickThrough() =>
+        NativeMethods.SetClickThrough(_hwnd, clickThrough: !(_interactive || _hoverActive));
+
+    private void OnHoverTick(object? sender, EventArgs e)
+    {
+        if (!IsHudVisible || _interactive)
+        {
+            _hoverTimer.Stop();
+            return;
+        }
+
+        var over = IsCursorOverCard();
+        if (over == _hoverActive)
+        {
+            return;
+        }
+
+        _hoverActive = over;
+        ApplyClickThrough();
+
+        if (over)
+        {
+            // Ховати картку з-під курсора, поки людина тягнеться до кнопки, — зле.
+            _autoHideTimer.Stop();
+        }
+        else if (!_pinnedOpen && _autoHideDuration is { } delay)
+        {
+            _autoHideTimer.Interval = delay;
+            _autoHideTimer.Start();
+        }
+    }
+
+    /// <summary>
+    /// Перевіряється саме картка, а не вікно: вікно більше на 20 DIP з кожного
+    /// боку — це поле під анімацію виїзду, і воно прозоре.
+    /// </summary>
+    private bool IsCursorOverCard()
+    {
+        if (!IsVisible || Hud.ActualWidth <= 0 || !NativeMethods.GetCursorPos(out var cursor))
+        {
+            return false;
+        }
+
+        try
+        {
+            // PointToScreen віддає фізичні пікселі — саме те, у чому працює GetCursorPos.
+            var topLeft = Hud.PointToScreen(new Point(0, 0));
+            var bottomRight = Hud.PointToScreen(new Point(Hud.ActualWidth, Hud.ActualHeight));
+
+            return cursor.X >= topLeft.X && cursor.X < bottomRight.X
+                && cursor.Y >= topLeft.Y && cursor.Y < bottomRight.Y;
+        }
+        catch (InvalidOperationException)
+        {
+            // Вікно могло втратити PresentationSource між перевіркою і викликом.
+            return false;
         }
     }
 
@@ -212,6 +301,10 @@ public partial class OverlayWindow : Window
         IsHudVisible = false;
         _interactive = false;
         _pinnedOpen = false;
+        _hoverActive = false;
+        _autoHideDuration = null;
+
+        _hoverTimer.Stop();
 
         RunHideAnimation();
     }
