@@ -15,6 +15,18 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
 
+    <!-- Версія видна у властивостях exe і в діалозі SmartScreen -->
+    <Version>0.9.0.1</Version>
+    <AssemblyVersion>0.9.0.1</AssemblyVersion>
+    <FileVersion>0.9.0.1</FileVersion>
+    <InformationalVersion>0.9.0.1</InformationalVersion>
+
+    <Product>NowPlaying HUD</Product>
+    <Company>Parsanov</Company>
+    <Authors>Parsanov</Authors>
+    <Copyright>© 2026 Parsanov</Copyright>
+    <Description>Компактний HUD поточного треку поверх ігор. Керування без виходу з фулскріну.</Description>
+
     <AssemblyName>NowPlayingHud</AssemblyName>
     <RootNamespace>NowPlayingHud</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
